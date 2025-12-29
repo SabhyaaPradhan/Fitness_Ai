@@ -41,6 +41,6 @@ def workout_suggestion(input: WorkoutSuggestionInput):
 # To run the server, use the command: uvicorn main:app --reload
 
 if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 8000))  # Default to 8000 if PORT is not set
+    port = int(os.environ.get("PORT", 1000))
     import uvicorn
     uvicorn.run("main:app", host="0.0.0.0", port=port)
