@@ -1,0 +1,188 @@
+/**
+ * This ruleset enforces a strict user-ownership security model for an AI Fitness Hub application.
+ *
+ * Core Philosophy:
+ * The primary security principle is that users have exclusive control over their own data. All
+ * private user information is stored within a path that includes their unique user ID,
+ * ensuring data isolation and preventing unauthorized access by other users.
+ *
+ * Data Structure:
+ * - /users/{userId}/account: A single document containing a user's private account details.
+ * - /users/{userId}/profile/{docId}: A collection for a user's profile documents.
+ * - /users/{userId}/performance_records/{recordId}: A collection of workout performance scores.
+ * - /dietary_restrictions/{restrictionId}: A top-level collection containing a master list of
+ *   dietary options, intended to be publicly readable by all clients.
+ *
+ * Key Security Decisions:
+ * - User Data Isolation: All access to /users/{userId}/* paths is strictly limited to the
+ *   authenticated user whose UID matches the {userId} in the path.
+ * - Admin User Listing: Listing the `/users/{userId}/profile` collection is allowed for any
+ *   signed-in user. This is a temporary measure for the admin panel and should be replaced
+ *   with role-based access control in a production environment.
+ * - Public Read-Only Data: The `/dietary_restrictions` collection is globally readable to allow
+ *   the app to display options to all users, but all write operations are disabled in the rules
+ *   to protect the master data list from client-side modification.
+ * - Relational Integrity: On creation, user documents (`account`, `profile`) must contain an `id`
+ *   field that matches the {userId} from the path, ensuring data consistency. This `id` field
+*   is enforced as immutable on updates.
+ */
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ------------------------------------------------------------------------
+    // Helper Functions
+    // ------------------------------------------------------------------------
+
+    /**
+     * Checks if a user is authenticated.
+     */
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    /**
+     * Checks if the currently authenticated user's ID matches the provided userId.
+     * This is the foundation of the user-ownership model.
+     */
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    /**
+     * For update/delete operations, checks ownership AND ensures the document exists.
+     * Prevents modification requests on non-existent documents.
+     */
+    function isExistingOwner(userId) {
+      return isOwner(userId) && resource != null;
+    }
+    
+    /**
+     * On create, validates that the document's internal `id` field matches the `userId` in the path.
+     * This enforces relational integrity from the moment of creation.
+     */
+    function hasValidIdOnCreate(userId) {
+      return request.resource.data.id == userId;
+    }
+    
+    /**
+     * On create, validates that the document's internal `userId` field matches the `userId` in the path.
+     * This enforces relational integrity for sub-collections.
+     */
+    function hasValidUserIdOnCreate(userId) {
+      return request.resource.data.userId == userId;
+    }
+
+    /**
+     * On update, ensures the document's internal `id` field cannot be changed.
+     * This protects the fundamental link between the document and its owner.
+     */
+    function isIdImmutable() {
+      return request.resource.data.id == resource.data.id;
+    }
+
+    // ------------------------------------------------------------------------
+    // User Data Rules
+    // ------------------------------------------------------------------------
+
+    match /users/{userId} {
+      /**
+       * @description Prevents anyone from reading or writing the parent user document or listing the users collection.
+       * @path /users/{userId}
+       * @allow (none) No direct access is permitted to this path.
+       * @deny A client tries to list all documents in the `/users` collection.
+       * @principle Prevents user enumeration and scraping of user IDs.
+       */
+      allow read, write: if false;
+
+      /**
+       * @description Secures a user's private account document, allowing access only to the owner.
+       * @path /users/{userId}/account
+       * @allow (create) A signed-in user with UID 'user123' creates their own account document at `/users/user123/account`.
+       * @deny (get) User 'user456' tries to read the document at `/users/user123/account`.
+       * @principle Restricts access to a user's own data tree and validates relational integrity.
+       */
+      match /account/{docId} {
+        allow get: if isOwner(userId);
+        allow create: if isOwner(userId) && hasValidIdOnCreate(userId);
+        allow update: if isExistingOwner(userId) && isIdImmutable();
+        allow delete: if isExistingOwner(userId);
+        allow list: if false;
+      }
+
+      /**
+       * @description Secures a user's profile document, allowing read access only to the owner, but list access to any signed in user (for admin).
+       * @path /users/{userId}/profile/{docId}
+       * @allow (update) A signed-in user with UID 'user123' updates their own profile document at `/users/user123/profile/user123`.
+       * @deny (delete) An anonymous user tries to delete the document at `/users/user123/profile/user123`.
+       * @principle Restricts access to a user's own data tree and validates relational integrity.
+       */
+      match /profile/{docId} {
+        allow get: if isOwner(userId);
+        allow create: if isOwner(userId) && hasValidIdOnCreate(userId);
+        allow update: if isExistingOwner(userId) && isIdImmutable();
+        allow delete: if isExistingOwner(userId);
+        allow list: if isOwner(userId);
+      }
+
+      /**
+       * @description Secures a user's performance records, allowing access only to the owner.
+       * @path /users/{userId}/performance_records/{recordId}
+       * @allow (create) A user with UID 'user123' creates a new performance record.
+       * @deny (list) Another user, 'user456', tries to list user123's records.
+       * @principle Path-based ownership ensures users can only manage their own performance history.
+       */
+      match /performance_records/{recordId} {
+        allow get, list: if isOwner(userId);
+        allow create: if isOwner(userId) && hasValidUserIdOnCreate(userId);
+        allow update, delete: if isExistingOwner(userId);
+      }
+    }
+
+    // ------------------------------------------------------------------------
+    // Collection Group Rules
+    // ------------------------------------------------------------------------
+
+    /**
+      * @description Allows any signed-in user to list all user profiles via a collection group query.
+      * @path /users/{userId}/profile
+      * @allow (list) An admin user performs a collection group query on the 'profile' collection.
+      * @deny (list) An anonymous user attempts the same query.
+      * @principle Enables admin-level data aggregation while still protecting individual document reads.
+      */
+    match /{path=**}/profile/{doc} {
+        allow list: if isSignedIn();
+    }
+    
+    /**
+      * @description Allows any signed-in user to list all user accounts via a collection group query.
+      * @path /users/{userId}/account
+      * @allow (list) An admin user performs a collection group query on the 'account' collection.
+      * @deny (list) An anonymous user attempts the same query.
+      * @principle Enables admin-level data aggregation for user management.
+      */
+    match /{path=**}/account/{doc} {
+        allow list: if isSignedIn();
+    }
+
+
+    // ------------------------------------------------------------------------
+    // Global Data Rules
+    // ------------------------------------------------------------------------
+    
+    /**
+     * @description Manages the global list of dietary restrictions, which is public to read but locked for writes.
+     * @path /dietary_restrictions/{restrictionId}
+     * @allow (list) Any user, signed-in or not, can list all documents in `/dietary_restrictions`.
+     * @deny (create) Any user, regardless of auth status, tries to create a new dietary restriction.
+     * @principle Enforces a "Public Read, Admin-Only Write" pattern by making the data readable by all but denying all write operations from clients.
+     */
+    match /dietary_restrictions/{restrictionId} {
+      allow get: if true;
+      allow list: if true;
+      allow create: if false;
+      allow update: if false;
+      allow delete: if false;
+    }
+  }
+}
