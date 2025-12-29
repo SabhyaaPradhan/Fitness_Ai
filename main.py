@@ -6,6 +6,7 @@ from src.ai.flows.personalized_workout_feedback import get_personalized_workout_
 from src.ai.flows.predict_workout_skipping import predict_workout_skipping, PredictWorkoutSkippingInput
 from src.ai.flows.smart_assistant_flow import get_smart_assistant_feedback, SmartAssistantInput
 from src.ai.flows.workout_suggestion_flow import suggest_next_exercise, WorkoutSuggestionInput
+import os
 
 app = FastAPI()
 
@@ -38,3 +39,8 @@ def workout_suggestion(input: WorkoutSuggestionInput):
     return suggest_next_exercise(input)
 
 # To run the server, use the command: uvicorn main:app --reload
+
+if __name__ == "__main__":
+    port = int(os.environ.get("PORT", 8000))  # Default to 8000 if PORT is not set
+    import uvicorn
+    uvicorn.run("main:app", host="0.0.0.0", port=port)
