@@ -1,4 +1,6 @@
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+from src.ai.flows.diet_plan_recommendations import recommend_diet_plan, DietPlanInput
 from src.ai.flows.food_nutrition_flow import get_food_nutrition, FoodNutritionInput
 from src.ai.flows.gym_recommender import recommend_gyms, GymRecommenderInput
 from src.ai.flows.motivational_fitness_updates import get_motivational_fitness_update, MotivationalFitnessUpdateInput
@@ -9,6 +11,18 @@ from src.ai.flows.workout_suggestion_flow import suggest_next_exercise, WorkoutS
 import os
 
 app = FastAPI()
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # Replace "*" with specific domains in production
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+@app.post("/api/recommend-diet-plan")
+def recommend_diet_plan_endpoint(input: DietPlanInput):
+    return recommend_diet_plan(input)
 
 @app.post("/api/food-nutrition")
 def food_nutrition(input: FoodNutritionInput):
@@ -41,6 +55,6 @@ def workout_suggestion(input: WorkoutSuggestionInput):
 # To run the server, use the command: uvicorn main:app --reload
 
 if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 1000))
+    port = int(os.environ.get("PORT", 10001))
     import uvicorn
     uvicorn.run("main:app", host="0.0.0.0", port=port)

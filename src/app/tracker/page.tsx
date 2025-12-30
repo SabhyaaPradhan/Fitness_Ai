@@ -65,7 +65,12 @@ export default function TrackerPage() {
     setIsLoading(true);
     setPrediction(null);
     try {
-      const result = await predictWorkoutSkippingAction(values);
+      const input = {
+        behavioral_data: values.behavioralData,
+        current_motivation_level: values.currentMotivationLevel,
+        schedule: values.schedule,
+      };
+      const result = await predictWorkoutSkippingAction(input);
       setPrediction(result);
     } catch (error) {
       console.error('Error getting prediction:', error);

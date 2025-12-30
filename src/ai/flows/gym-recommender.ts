@@ -1,46 +1,39 @@
-'use server';
+export type GymRecommenderInput = {
+  goals: string;
+  location: string;
+  preferences: string;
+  history: string;
+};
 
-/**
- * @fileOverview A recommendation engine for gyms, workout programs, and fitness challenges.
- *
- * - recommendGyms - A function that suggests fitness options based on user preferences.
- */
-
-import { ai } from '@/ai/genkit';
-import {
-    GymRecommenderInput,
-    GymRecommenderInputSchema,
-    GymRecommenderOutput,
-    GymRecommenderOutputSchema
-} from '@/ai/schemas/gym-recommender-schemas';
+export type GymRecommenderOutput = {
+  recommendations: string[];
+};
 
 export async function recommendGyms(input: GymRecommenderInput): Promise<GymRecommenderOutput> {
-  return gymRecommenderFlow(input);
-}
+  try {
+    const response = await fetch('http://localhost:10001/api/recommend-gyms', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(input),
+    });
 
-const prompt = ai.definePrompt({
-  name: 'gymRecommenderPrompt',
-  input: { schema: GymRecommenderInputSchema },
-  output: { schema: GymRecommenderOutputSchema },
-  prompt: `You are a fitness recommendation expert. Based on the user's goals, location, preferences, and workout history, suggest a mix of nearby gyms, workout programs, and fitness challenges.
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
 
-User Goals: {{{goals}}}
-User Location: {{{location}}}
-User Preferences: {{{preferences}}}
-User History: {{{history}}}
-
-Provide a diverse list of recommendations. For gyms, include their general location.
-Output a valid JSON object with the given schema.`,
-});
-
-const gymRecommenderFlow = ai.defineFlow(
-  {
-    name: 'gymRecommenderFlow',
-    inputSchema: GymRecommenderInputSchema,
-    outputSchema: GymRecommenderOutputSchema,
-  },
-  async (input) => {
-    const { output } = await prompt(input);
-    return output!;
+    const data = await response.json();
+    return data;
+  } catch (error) {
+    console.error('Error calling recommend gyms API:', error);
+    // Fallback to sample data if API is not available
+    return {
+      recommendations: [
+        "Gym A - Close to your location",
+        "Yoga Program - Suitable for relaxation",
+        "Fitness Challenge - 30-day weight loss program"
+      ]
+    };
   }
-);
+}

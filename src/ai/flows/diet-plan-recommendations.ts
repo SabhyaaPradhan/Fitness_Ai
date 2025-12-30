@@ -1,70 +1,39 @@
-'use server';
+export type DietPlanInput = {
+  bmi: number;
+  weight_goal: string;
+  dietary_preferences: string;
+  user_history?: string;
+};
 
-/**
- * @fileOverview This file defines a Genkit flow for recommending personalized diet plans based on user inputs like BMI, weight goals, and dietary preferences.
- *
- * - `recommendDietPlan`: A function that takes user information and returns a personalized diet plan.
- * - `DietPlanInput`: The input type for the `recommendDietPlan` function.
- * - `DietPlanOutput`: The output type for the `recommendDietPlan` function.
- */
+export type DietPlanOutput = {
+  diet_plan: string;
+  grocery_list: string;
+  nutritional_information: string;
+};
 
-import {ai} from '@/ai/genkit';
-import {z} from 'zod';
+export async function recommendDietPlan(input: DietPlanInput): Promise<DietPlanOutput> {
+  try {
+    const response = await fetch('http://localhost:10001/api/recommend-diet-plan', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(input),
+    });
 
-const DietPlanInputSchema = z.object({
-  bmi: z.number().describe('The user’s Body Mass Index (BMI).'),
-  weightGoal: z
-    .string()
-    .describe(
-      'The user’s weight goal, e.g., lose weight, maintain weight, gain weight.'
-    ),
-  dietaryPreferences:
-    z.string().describe('The user’s dietary preferences, e.g., vegetarian, vegan, gluten-free.'),
-  userHistory: z
-    .string()
-    .optional()
-    .describe('The user’s historical diet data and feedback.'),
-});
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
 
-export type DietPlanInput = z.infer<typeof DietPlanInputSchema>;
-
-const DietPlanOutputSchema = z.object({
-  dietPlan: z.string().describe('A personalized diet plan based on the user inputs.'),
-  groceryList: z.string().describe('A grocery list for the recommended diet plan.'),
-  nutritionalInformation:
-    z.string().describe('Nutritional information for the diet plan.'),
-});
-
-export type DietPlanOutput = z.infer<typeof DietPlanOutputSchema>;
-
-export async function recommendDietPlan(
-  input: DietPlanInput
-): Promise<DietPlanOutput> {
-  return recommendDietPlanFlow(input);
-}
-
-const prompt = ai.definePrompt({
-  name: 'dietPlanPrompt',
-  input: {schema: DietPlanInputSchema},
-  output: {schema: DietPlanOutputSchema},
-  prompt: `You are an AI Dietician that recommends personalized diet plans based on the user's BMI, weight goals, and dietary preferences.
-
-  BMI: {{{bmi}}}
-  Weight Goal: {{{weightGoal}}}
-  Dietary Preferences: {{{dietaryPreferences}}}
-  User History: {{{userHistory}}}
-
-  Generate a personalized diet plan, a grocery list for the diet plan, and nutritional information for the diet plan.`,
-});
-
-const recommendDietPlanFlow = ai.defineFlow(
-  {
-    name: 'recommendDietPlanFlow',
-    inputSchema: DietPlanInputSchema,
-    outputSchema: DietPlanOutputSchema,
-  },
-  async input => {
-    const {output} = await prompt(input);
-    return output!;
+    const data = await response.json();
+    return data;
+  } catch (error) {
+    console.error('Error calling diet plan API:', error);
+    // Fallback to sample data if API is not available
+    return {
+      diet_plan: `Personalized diet plan for BMI ${input.bmi}, goal: ${input.weight_goal}, preferences: ${input.dietary_preferences}`,
+      grocery_list: "Sample grocery list based on the diet plan.",
+      nutritional_information: "Sample nutritional information for the diet plan."
+    };
   }
-);
+}

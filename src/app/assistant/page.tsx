@@ -59,8 +59,50 @@ export default function AssistantPage() {
     setIsLoading(true);
     setFeedback(null);
     try {
-      const result = await getSmartAssistantFeedbackAction(values);
-      setFeedback(result);
+      // Log the request payload
+      console.log("Request payload:", values);
+
+      // Transform the data to match backend expectations
+      const backendInput: any = {
+          workout_type: values.workoutType,
+          current_set: Number(values.currentSet),
+          rep_count: Number(values.repCount),
+          perceived_exertion: values.perceivedExertion,
+      };
+
+      // Only include optional fields if they have values
+      if (values.heartRate) backendInput.heart_rate = Number(values.heartRate);
+      if (values.timeUnderTension) backendInput.time_under_tension = Number(values.timeUnderTension);
+      if (values.weightLifted) backendInput.weight_lifted = values.weightLifted;
+
+      // Send the request to the backend
+      const response = await fetch("http://localhost:10001/api/smart-assistant-feedback", {
+          method: "POST",
+          headers: {
+              "Content-Type": "application/json",
+          },
+          body: JSON.stringify(backendInput),
+      });
+
+      console.log("Raw response:", response);
+
+      const result = await response.json();
+
+      console.log("Parsed response:", result);
+
+      if (!result || !result.intensity_recommendation || !result.rest_suggestion) {
+          console.error("API response is missing expected fields:", result);
+      }
+
+      const mappedFeedback = {
+          intensity_recommendation: result?.intensity_recommendation || "No recommendation available",
+          rest_suggestion: result?.rest_suggestion || "No rest suggestion available",
+          motivational_nudge: result?.motivational_nudge || "No motivational message available",
+      };
+
+      console.log("Mapped Feedback:", mappedFeedback);
+
+      setFeedback(mappedFeedback);
     } catch (error) {
       console.error('Error getting feedback:', error);
     } finally {
@@ -219,8 +261,15 @@ export default function AssistantPage() {
                         Intensity Recommendation
                     </h3>
                     <p className="text-base font-medium">
-                        {feedback.intensityRecommendation.includes('ncrease') ? <ArrowUp className="inline-block mr-2 h-5 w-5 text-green-500"/> : feedback.intensityRecommendation.includes('ecrease') || feedback.intensityRecommendation.includes('educe') ? <ArrowDown className="inline-block mr-2 h-5 w-5 text-red-500"/> : null}
-                        {feedback.intensityRecommendation}
+                        {feedback?.intensity_recommendation?.includes('ncrease') ? (
+                            <ArrowUp className="inline-block mr-2 h-5 w-5 text-green-500" />
+                        ) : feedback?.intensity_recommendation?.includes('ecrease') || feedback?.intensity_recommendation?.includes('educe') ? (
+                            <ArrowDown className="inline-block mr-2 h-5 w-5 text-red-500" />
+                        ) : null}
+                        {feedback?.intensity_recommendation || "No recommendation available"}
+                    </p>
+                    <p className="text-base font-medium">
+                        {feedback?.rest_suggestion || "No rest suggestion available"}
                     </p>
                 </div>
                  <div className="p-4 bg-secondary rounded-lg">
@@ -228,12 +277,12 @@ export default function AssistantPage() {
                         <Timer className="mr-2 h-5 w-5"/> Suggested Rest
                     </h3>
                     <p className="text-base font-medium">
-                        {feedback.restSuggestion}
+                        {feedback.rest_suggestion}
                     </p>
                 </div>
                  <div className="p-4 bg-accent rounded-lg">
                     <p className="text-base font-medium text-accent-foreground italic">
-                        "{feedback.motivationalNudge}"
+                        "{feedback.motivational_nudge}"
                     </p>
                 </div>
               </div>

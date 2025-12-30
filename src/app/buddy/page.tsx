@@ -36,13 +36,13 @@ export default function BuddyPage() {
 
     try {
       const result = await getMotivationalFitnessUpdateAction({
-        userMessage: input,
+        user_message: input,
       });
       
-      const assistantMessage: ChatMessage = { 
-        role: 'assistant', 
-        content: result.motivationalMessage,
-        guidance: result.personalizedGuidance,
+      const assistantMessage: ChatMessage = {
+        role: 'assistant',
+        content: result.motivational_message,
+        guidance: result.personalized_guidance,
       };
       setMessages(prev => [...prev, assistantMessage]);
 

@@ -26,6 +26,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { recommendDietPlanAction } from './actions';
 import { DietPlanOutput } from '@/ai/flows/diet-plan-recommendations';
+import { FoodNutritionOutput } from '@/ai/flows/food-nutrition-flow';
 import {
   Select,
   SelectContent,
@@ -60,19 +61,13 @@ function DietPlanTab() {
     setIsLoading(true);
     setPlan(null);
     try {
-      const response = await fetch("http://127.0.0.1:8000/api/recommend-diet-plan", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(values),
-      });
-
-      if (!response.ok) {
-        throw new Error("Failed to fetch diet plan");
-      }
-
-      const result = await response.json();
+      const input = {
+        bmi: values.bmi,
+        weight_goal: values.weightGoal,
+        dietary_preferences: values.dietaryPreferences,
+        user_history: values.userHistory,
+      };
+      const result = await recommendDietPlanAction(input);
       setPlan(result);
     } catch (error) {
       console.error("Error getting diet plan:", error);
@@ -188,13 +183,13 @@ function DietPlanTab() {
                 <TabsTrigger value="nutrition"><Info className="w-4 h-4 mr-2"/>Nutrition</TabsTrigger>
               </TabsList>
               <TabsContent value="plan" className="mt-4 p-4 bg-secondary rounded-md max-h-96 overflow-y-auto">
-                <pre className="whitespace-pre-wrap text-sm text-secondary-foreground">{plan.dietPlan}</pre>
+                <pre className="whitespace-pre-wrap text-sm text-secondary-foreground">{plan.diet_plan}</pre>
               </TabsContent>
               <TabsContent value="grocery" className="mt-4 p-4 bg-secondary rounded-md max-h-96 overflow-y-auto">
-                 <pre className="whitespace-pre-wrap text-sm text-secondary-foreground">{plan.groceryList}</pre>
+                 <pre className="whitespace-pre-wrap text-sm text-secondary-foreground">{plan.grocery_list}</pre>
               </TabsContent>
               <TabsContent value="nutrition" className="mt-4 p-4 bg-secondary rounded-md max-h-96 overflow-y-auto">
-                 <pre className="whitespace-pre-wrap text-sm text-secondary-foreground">{plan.nutritionalInformation}</pre>
+                 <pre className="whitespace-pre-wrap text-sm text-secondary-foreground">{plan.nutritional_information}</pre>
               </TabsContent>
             </Tabs>
           )}
@@ -224,7 +219,7 @@ function FoodDatabaseTab() {
     setIsLoading(true);
     setFoodData(null);
     try {
-      const response = await fetch("http://127.0.0.1:8000/api/food-nutrition", {
+      const response = await fetch("http://localhost:10001/api/food-nutrition", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
